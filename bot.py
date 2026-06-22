@@ -4,12 +4,32 @@ import datetime
 import json
 import os
 import random
+# --- WEBSERVER IMPORTS FOR RENDER 24/7 BYPASS ---
+from flask import Flask
+from threading import Thread
+
+# --- MINIMAL FLASK SERVER TO TRICK RENDER ---
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Predictor Core Engine is online!"
+
+def run_server():
+    # Render routes traffic to port 10000 by default if PORT env isn't set
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run_server)
+    t.daemon = True
+    t.start()
 
 # --- CONFIGURATION SETTINGS ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")  # Hidden securely via Render vault
 CHANNEL_ID = 1518727458919284937  # Your verified Discord channel ID
 
-DATA_FILE = "probability_memory.json"
+DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get("RENDER") else "probability_memory.json"
 
 # 1. FIXED GAME PERCENTAGES 
 SEED_ODDS = {
@@ -30,8 +50,11 @@ if os.path.exists(DATA_FILE):
         pass
 
 def save_data():
-    with open(DATA_FILE, "w") as f:
-        json.dump(memory, f)
+    try:
+        with open(DATA_FILE, "w") as f:
+            json.dump(memory, f)
+    except Exception as e:
+        print(f"Failed to save JSON data: {e}")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -101,6 +124,36 @@ async def predict_24_hours(ctx):
     # Run a 24-hour simulation loop (288 cycles of 5-minute intervals)
     for cycle in range(1, 289):
         simulated_time = now + datetime.timedelta(minutes=cycle * 5)
+        
+        for seed, base_chance in SEED_ODDS.items():
+            roll = random.uniform(0, 100)
+            if roll <= base_chance:
+                time_str = simulated_time.strftime("%I:%M %p")
+                predictions[seed].append(time_str)
+
+    embed = discord.Embed(
+        title="🔮 24-HOUR SHOP RESTOCK TIMELINE FORECAST 🔮",
+        description="Estimated high-probability hours when rare seeds are most likely to drop over the next 24 hours:",
+        color=discord.Color.purple()
+    )
+
+    for seed, times in predictions.items():
+        if times:
+            display_times = ", ".join(times[:5])
+            if len(times) > 5:
+                display_times += f" (+{len(times)-5} more windows)"
+        else:
+            display_times = "❌ No restocks predicted in the next 24 hours."
+
+        embed.add_field(name=f"🔹 {seed} (Chance: {SEED_ODDS[seed]}%)", value=f"⏱️ **Estimated Windows:** {display_times}", inline=False)
+
+    embed.set_footer(text="Treat these as prime high-probability hunting windows!")
+    await ctx.send(embed=embed)
+
+# --- START THE WEB SERVER AND THEN LAUNCH THE BOT ---
+if __name__ == "__main__":
+    keep_alive()  # Fires up the Flask engine in the background
+    bot.run(TOKEN)
         
         for seed, base_chance in SEED_ODDS.items():
             roll = random.uniform(0, 100)
