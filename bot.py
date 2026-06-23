@@ -32,7 +32,7 @@ DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get(
 
 # 1. EXPANDED DATABASE WITH ALL SEED DROP PERCENTAGES
 SEED_ODDS = {
-    # --- Common & Uncommon (High Drop Rates) ---
+    # --- Common & Uncommon ---
     "Carrot": 15.0, "Strawberry": 12.0, "Blueberry": 10.0, 
     "Tulip": 8.0, "Tomato": 8.0, "Apple": 7.0, 
     # --- Rare ---
@@ -73,7 +73,7 @@ async def on_ready():
     print(f'Logged in successfully as {bot.user}')
     print('Predictor Core Engine is live on Render cloud!')
 
-# 2. REPORT COMMAND (Now accepts all 26 seeds!)
+# 2. REPORT COMMAND
 @bot.command(name="report")
 async def report_seed(ctx, *, seed_name: str):
     if ctx.channel.id != CHANNEL_ID:
@@ -90,22 +90,18 @@ async def report_seed(ctx, *, seed_name: str):
 
     await ctx.send(f"📥 **Log Saved:** **{seed}** logged! Timers have been re-calibrated.")
 
-# 3. NEXT-RESET PROBABILITY COMMAND
+# 3. NEXT-RESET PROBABILITY COMMAND (ALL SEEDS)
 @bot.command(name="predict")
 async def check_odds(ctx):
     if ctx.channel.id != CHANNEL_ID:
         return
 
     now = datetime.datetime.now(datetime.timezone.utc)
+    
+    # Split into multiple messages if needed so Discord doesn't hit the 2000 character limit
     response_msg = "🔮 **LIVE SHOP SPAWN PROBABILITIES (NEXT 5 MINS)** 🔮\n\n"
 
-    # Only show rare, legendary, mythic, and super seeds here so chat doesn't overflow
-    high_tier_filters = ["Venus Fly Trap", "Pomegranate", "Poison Apple", "Venom Splitter", "Moon Bloom", "Dragon's Breath", "Dragon Fruit", "Acorn", "Cherry", "Sunflower"]
-
     for seed, base_chance in SEED_ODDS.items():
-        if seed not in high_tier_filters:
-            continue  # Skips carrots/tomatoes in the printout so it is easy to read
-            
         if seed in memory["last_seen"]:
             last_time = datetime.datetime.fromisoformat(memory["last_seen"][seed])
             minutes_since = int((now - last_time).total_seconds() / 60)
@@ -115,18 +111,66 @@ async def check_odds(ctx):
             accumulated_odds = (1 - (chance_of_missing ** max(1, rotations_missed))) * 100
             
             status = f"⏱️ Last seen: `{minutes_since} mins ago`"
-            if accumulated_odds > 65:
+            if accumulated_odds > 75:
                 status += " ⚠️ **HIGHLY OVERDUE!**"
         else:
             accumulated_odds = base_chance
             status = "⏱️ Last seen: `Never logged`"
 
-        response_msg += f"🔹 **{seed}**\n   • Next Reset Drop Chance: **{accumulated_odds:.2f}%** (Base: {base_chance}%)\n   • {status}\n\n"
+        response_msg += f"🔹 **{seed}**\n   • Next Reset Chance: **{accumulated_odds:.2f}%** (Base: {base_chance}%)\n   • {status}\n\n"
+        
+        # If message gets close to Discord's character limit, send it and open a new chunk
+        if len(response_msg) > 1600:
+            await ctx.send(response_msg)
+            response_msg = ""
 
-    await ctx.send(response_msg)
+    if response_msg:
+        await ctx.send(response_msg)
 
-# 4. 24-HOUR TIMELINE FORECAST SIMULATOR
+# 4. 24-HOUR TIMELINE FORECAST SIMULATOR (ALL SEEDS)
 @bot.command(name="predict24h")
+async def predict_24_hours(ctx):
+    if ctx.channel.id != CHANNEL_ID:
+        return
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    predictions = {seed: [] for seed in SEED_ODDS}
+    
+    for cycle in range(1, 289):
+        simulated_time = now + datetime.timedelta(minutes=cycle * 5)
+        
+        for seed, base_chance in SEED_ODDS.items():
+            roll = random.uniform(0, 100)
+            if roll <= base_chance:
+                time_str = simulated_time.strftime("%I:%M %p")
+                predictions[seed].append(time_str)
+
+    # Discord embeds can have up to 25 fields. Since we have 26 seeds, we will create two clean embeds so nothing gets cut off!
+    embed1 = discord.Embed(title="🔮 24-HOUR SHOP RESTOCK TIMELINE (PART 1) 🔮", color=discord.Color.purple())
+    embed2 = discord.Embed(title="🔮 24-HOUR SHOP RESTOCK TIMELINE (PART 2) 🔮", color=discord.Color.purple())
+
+    count = 0
+    for seed, times in predictions.items():
+        count += 1
+        if times:
+            display_times = ", ".join(times[:4]) # Show first 4 windows to save mobile layout space
+            if len(times) > 4:
+                display_times += f" (+{len(times)-4} more)"
+        else:
+            display_times = "❌ No restocks predicted in the next 24 hours."
+
+        # Split the seeds evenly across embed panels
+        if count <= 13:
+            embed1.add_field(name=f"🔹 {seed} ({SEED_ODDS[seed]}%)", value=f"⏱️ {display_times}", inline=False)
+        else:
+            embed2.add_field(name=f"🔹 {seed} ({SEED_ODDS[seed]}%)", value=f"⏱️ {display_times}", inline=False)
+
+    await ctx.send(embed=embed1)
+    await ctx.send(embed=embed2)
+
+if __name__ == "__main__":
+    keep_alive()  
+    bot.run(TOKEN)
 async def predict_24_hours(ctx):
     if ctx.channel.id != CHANNEL_ID:
         return
