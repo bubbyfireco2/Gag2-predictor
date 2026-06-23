@@ -1,10 +1,12 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import datetime
 import json
 import os
 import random
 import asyncio
+import urllib.request
+from bs4 import BeautifulSoup
 from flask import Flask
 from threading import Thread
 
@@ -13,7 +15,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "Predictor Core Engine is online!"
+    return "Predictor Web-Scraper Engine is online!"
 
 def run_server():
     port = int(os.environ.get("PORT", 8080))
@@ -26,7 +28,7 @@ def keep_alive():
 
 # --- CONFIGURATION SETTINGS ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")  
-CHANNEL_ID = 1518727458919284937  # Your personal alert channel ID where the tracker mirrors
+CHANNEL_ID = 1518727458919284937  # Your personal alert channel ID where predictions post
 
 DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get("RENDER") else "probability_memory.json"
 
@@ -65,13 +67,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Uncapped Automated Predictor is live!')
+    print('Web-Scraping Live Predictor is active!')
+    scrape_website_loop.start() # Boots up the automatic background web-checker loop
 
-async def run_auto_predictions(channel):
-    global active_predictions
+async def post_fresh_dashboards(channel):
+    global active_predictions, active_embeds
     now = datetime.datetime.now(datetime.timezone.utc)
-    response_msg = "🔮 **LIVE SHOP SPAWN PROBABILITIES (NEXT RESTOCK WINDOW)** 🔮\n\n"
     
+    # 1. Compile 5-minute probabilities text block
+    response_msg = "🔮 **LIVE SHOP SPAWN PROBABILITIES (NEXT RESTOCK WINDOW)** 🔮\n\n"
     for item, base_chance in ALL_ITEMS_ODDS.items():
         if item in memory["last_seen"]:
             last_time = datetime.datetime.fromisoformat(memory["last_seen"][item])
@@ -90,25 +94,20 @@ async def run_auto_predictions(channel):
             msg = await channel.send(response_msg)
             active_predictions.append(msg)
             response_msg = ""
-            
     if response_msg: 
         msg = await channel.send(response_msg)
         active_predictions.append(msg)
 
-async def run_auto_24h_forecast(channel):
-    global active_embeds
-    now = datetime.datetime.now(datetime.timezone.utc)
+    # 2. Compile 24-hour simulation embed charts
     predictions = {item: [] for item in ALL_ITEMS_ODDS}
-    
     for cycle in range(1, 289):
         simulated_time = now + datetime.timedelta(minutes=cycle * 5)
         for item, base_chance in ALL_ITEMS_ODDS.items():
-            roll = random.uniform(0, 100)
-            if roll <= base_chance:
+            if random.uniform(0, 100) <= base_chance:
                 predictions[item].append(simulated_time.strftime("%I:%M %p"))
                 
-    embed1 = discord.Embed(title="🔮 AUTOMATED 24-HOUR FORECAST TIMELINE (PART 1) 🔮", color=discord.Color.purple())
-    embed2 = discord.Embed(title="🔮 AUTOMATED 24-HOUR FORECAST TIMELINE (PART 2) 🔮", color=discord.Color.purple())
+    embed1 = discord.Embed(title="🔮 AUTOMATED 24-HOUR FORECAST (PART 1) 🔮", color=discord.Color.purple())
+    embed2 = discord.Embed(title="🔮 AUTOMATED 24-HOUR FORECAST (PART 2) 🔮", color=discord.Color.purple())
     count = 0
     for item, times in predictions.items():
         count += 1
@@ -121,60 +120,61 @@ async def run_auto_24h_forecast(channel):
     msg2 = await channel.send(embed=embed2)
     active_embeds.extend([msg1, msg2])
 
-# --- SIMPLIFIED UNRESTRICTED AUTO LOGGER ---
-@bot.event
-async def on_message(message):
+# --- BACKGROUND WEB-SCRAPER LOOP (SCRAPES EVERY 60 SECONDS) ---
+@tasks.loop(seconds=60)
+async def scrape_website_loop():
     global active_predictions, active_embeds
-    
-    # 1. Broadly check if the message is in your channel
-    if message.channel.id == CHANNEL_ID:
-        # Ignore messages sent by your own bot to prevent endless spam loops
-        if message.author.id == bot.user.id:
-            return
+    channel = bot.get_channel(CHANNEL_ID)
+    if not channel:
+        return
 
-        text_to_scan = ""
-        if message.content:
-            text_to_scan += " " + message.content.lower()
-        if message.embeds:
-            for embed in message.embeds:
-                if embed.title: text_to_scan += " " + embed.title.lower()
-                if embed.description: text_to_scan += " " + embed.description.lower()
-                for field in embed.fields:
-                    text_to_scan += " " + field.name.lower() + " " + field.value.lower()
+    try:
+        # Fetch the live HTML text document directly from growagarden2stock.com
+        req = urllib.request.Request('https://growagarden2stock.com/', headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req) as response:
+            html = response.read()
+            
+        soup = BeautifulSoup(html, 'html.parser')
+        page_text = soup.get_text().lower()
 
         found_items = []
-        # Fallback check for general keyword "mushroom"
-        if "mushroom" in text_to_scan:
-            found_items.append("Mushroom")
-
-        # Directly match raw English substrings from the message
         for item in ALL_ITEMS_ODDS.keys():
-            if item.lower() in text_to_scan:
-                if item not in found_items:
-                    found_items.append(item)
+            if item.lower() in page_text:
+                found_items.append(item)
 
-        # 2. If ANY item is detected, instantly fire the prediction display engine
         if found_items:
             now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            
+            # Check if any of these found items are brand new compared to what we saw 60 seconds ago
+            is_new_restock = False
             for item in found_items:
+                if item not in memory["last_seen"]:
+                    is_new_restock = True
                 memory["last_seen"][item] = now_utc
-            save_data()
-            print(f"[UNRESTRICTED LOG SUCCESS] Auto-logged: {', '.join(found_items)}")
-            
-            # Wipe older posts
-            for old_msg in active_predictions + active_embeds:
-                try: await old_msg.delete()
-                except: pass
-            active_predictions.clear()
-            active_embeds.clear()
-            
-            # Post fresh data
-            await asyncio.sleep(1)
-            await run_auto_predictions(message.channel)
-            await run_auto_24h_forecast(message.channel)
 
+            # IF A FRESH WEB RESTOCK IS DETECTED, RE-CALCULATE AND WIPE CHAT!
+            if is_new_restock:
+                save_data()
+                print(f"[WEB SCRAPE SUCCESS] Automatically harvested stock items: {', '.join(found_items)}")
+                
+                # Delete the old chart lists from 5 minutes ago
+                for old_msg in active_predictions + active_embeds:
+                    try: await old_msg.delete()
+                    except: pass
+                active_predictions.clear()
+                active_embeds.clear()
+                
+                # Post the fresh probability timelines
+                await post_fresh_dashboards(channel)
+    except Exception as e:
+        print(f"Web Scraper Connection Error: {e}")
+
+# Disable standard on_message to save cloud performance
+@bot.event
+async def on_message(message):
     await bot.process_commands(message)
 
 if __name__ == "__main__":
     keep_alive()  
     bot.run(TOKEN)
+
