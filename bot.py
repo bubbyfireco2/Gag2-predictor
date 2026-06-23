@@ -25,20 +25,23 @@ def keep_alive():
 
 # --- CONFIGURATION SETTINGS ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")  
-CHANNEL_ID = 1518727458919284937  # Your personal alert channel ID
-
-# --- TARGET ENGINES (Change these to match the official server you are tracking!) ---
-# Replace with the exact Channel ID of the official server's stock log channel
-OFFICIAL_STOCK_CHANNEL_ID = 1514960824060350569  
+CHANNEL_ID = 1518727458919284937  # Your personal alert channel ID where the tracker mirrors
 
 DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get("RENDER") else "probability_memory.json"
 
-SEED_ODDS = {
+# COMBINED DATABASE WITH ALL SEED AND GEAR PERCENTAGES
+ALL_ITEMS_ODDS = {
+    # --- Common & Uncommon Seeds ---
     "Carrot": 15.0, "Strawberry": 12.0, "Blueberry": 10.0, "Tulip": 8.0, "Tomato": 8.0, "Apple": 7.0, 
+    # --- Rare & Epic Seeds ---
     "Bamboo": 5.0, "Corn": 5.0, "Cactus": 4.5, "Pineapple": 4.0, "Mushroom": 3.5, "Green Bean": 3.5, 
-    "Banana": 3.0, "Grape": 3.0, "Coconut": 2.5, "Mango": 2.5, "Dragon Fruit": 2.0, "Acorn": 1.5, 
-    "Cherry": 1.5, "Sunflower": 1.2, "Venus Fly Trap": 1.0, "Pomegranate": 1.0, "Poison Apple": 3.0, 
-    "Venom Splitter": 2.5, "Moon Bloom": 1.0, "Dragon's Breath": 0.5
+    "Banana": 3.0, "Grape": 3.0, "Coconut": 2.5, "Mango": 2.5, 
+    # --- Legendary, Mythic & Super Seeds ---
+    "Dragon Fruit": 2.0, "Acorn": 1.5, "Cherry": 1.5, "Sunflower": 1.2, "Venus Fly Trap": 1.0, 
+    "Pomegranate": 1.0, "Poison Apple": 3.0, "Venom Splitter": 2.5, "Moon Bloom": 1.0, "Dragon's Breath": 0.5,
+    # --- Gear Shop Items ---
+    "Common Watering Can": 15.0, "Speed Mushroom": 8.0, "Uncommon Sprinkler": 6.0,
+    "Rare Sprinkler": 3.0, "Epic Sprinkler": 1.5, "Legendary Sprinkler": 0.5
 }
 
 memory = {"last_seen": {}}
@@ -60,48 +63,60 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Predictor Automation Core is live!')
+    print('Predictor Channel-Locked Core is live on Render!')
 
-# --- THE PASSTHROUGH CROWD-SOURCE AUTO LOGGER ---
+# --- STRIP-MINING DATA HUB (CHANNEL ID LOCKED) ---
 @bot.event
 async def on_message(message):
-    # Check if the incoming message is coming from the official server's stock channel
-    if message.channel.id == OFFICIAL_STOCK_CHANNEL_ID:
-        content = message.content.title()
-        
-        # Scan the text body to see if any of our tracked seeds are written inside it
-        for seed in SEED_ODDS.keys():
-            if seed in content:
+    # STRICT SECURITY CHECK: Only reads messages landing inside your designated mirrored room
+    if message.channel.id == CHANNEL_ID:
+        text_to_scan = ""
+
+        # 1. Gather all plain text content (Reads the @Strawberry, @Apple pings cleanly)
+        if message.content:
+            text_to_scan += message.content.title()
+
+        # 2. Gather all embed content blocks (Reads the core lists inside the dark box)
+        if message.embeds:
+            for embed in message.embeds:
+                if embed.title: text_to_scan += " " + embed.title.title()
+                if embed.description: text_to_scan += " " + embed.description.title()
+                for field in embed.fields:
+                    text_to_scan += " " + field.name.title() + " " + field.value.title()
+
+        # 3. Match text blobs to update timestamps for your calculations
+        found_items = []
+        for item in ALL_ITEMS_ODDS.keys():
+            if item in text_to_scan:
                 now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                memory["last_seen"][seed] = now_utc
-                save_data()
-                
-                # Push a silent mirror receipt confirmation to your personal server
-                personal_channel = bot.get_channel(CHANNEL_ID)
-                if personal_channel:
-                    await personal_channel.send(f"🤖 **Auto-Scraped Restock:** Caught **{seed}** text notification from host channel! Synchronized probabilities.")
-                break
-                
-    # Keep standard manual typing commands active as back-up parameters
+                memory["last_seen"][item] = now_utc
+                found_items.append(item)
+
+        if found_items:
+            save_data()
+            print(f"[CHANNEL ACCELERATOR] Auto-logged: {', '.join(found_items)}")
+
+    # Processes normal commands like !predict and !predict24h inside the channel
     await bot.process_commands(message)
 
 @bot.command(name="report")
-async def report_seed(ctx, *, seed_name: str):
+async def report_item(ctx, *, item_name: str):
     if ctx.channel.id != CHANNEL_ID: return
-    seed = seed_name.strip().title()
-    if seed not in SEED_ODDS: return
-    memory["last_seen"][seed] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    item = item_name.strip().title()
+    if item not in ALL_ITEMS_ODDS: return
+    memory["last_seen"][item] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     save_data()
-    await ctx.send(f"📥 **Manual Log Saved:** **{seed}** locked.")
+    await ctx.send(f"📥 **Manual Log Saved:** **{item}** locked.")
 
 @bot.command(name="predict")
 async def check_odds(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     now = datetime.datetime.now(datetime.timezone.utc)
     response_msg = "🔮 **LIVE SHOP SPAWN PROBABILITIES (NEXT 5 MINS)** 🔮\n\n"
-    for seed, base_chance in SEED_ODDS.items():
-        if seed in memory["last_seen"]:
-            last_time = datetime.datetime.fromisoformat(memory["last_seen"][seed])
+    
+    for item, base_chance in ALL_ITEMS_ODDS.items():
+        if item in memory["last_seen"]:
+            last_time = datetime.datetime.fromisoformat(memory["last_seen"][item])
             minutes_since = int((now - last_time).total_seconds() / 60)
             rotations_missed = minutes_since // 5
             chance_of_missing = 1 - (base_chance / 100)
@@ -111,32 +126,37 @@ async def check_odds(ctx):
         else:
             accumulated_odds = base_chance
             status = "⏱️ Last seen: `Never logged`"
-        response_msg += f"🔹 **{seed}**\n   • Next Reset Chance: **{accumulated_odds:.2f}%**\n   • {status}\n\n"
+            
+        response_msg += f"🔹 **{item}**\n   • Next Reset Chance: **{accumulated_odds:.2f}%**\n   • {status}\n\n"
         if len(response_msg) > 1600:
             await ctx.send(response_msg)
             response_msg = ""
+            
     if response_msg: await ctx.send(response_msg)
 
 @bot.command(name="predict24h")
 async def predict_24_hours(ctx):
     if ctx.channel.id != CHANNEL_ID: return
     now = datetime.datetime.now(datetime.timezone.utc)
-    predictions = {seed: [] for seed in SEED_ODDS}
+    predictions = {item: [] for item in ALL_ITEMS_ODDS}
+    
     for cycle in range(1, 289):
         simulated_time = now + datetime.timedelta(minutes=cycle * 5)
-        for seed, base_chance in SEED_ODDS.items():
+        for item, base_chance in ALL_ITEMS_ODDS.items():
             roll = random.uniform(0, 100)
             if roll <= base_chance:
-                predictions[seed].append(simulated_time.strftime("%I:%M %p"))
-    embed1 = discord.Embed(title="🔮 24-HOUR SHOP RESTOCK TIMELINE (PART 1) 🔮", color=discord.Color.purple())
-    embed2 = discord.Embed(title="🔮 24-HOUR SHOP RESTOCK TIMELINE (PART 2) 🔮", color=discord.Color.purple())
+                predictions[item].append(simulated_time.strftime("%I:%M %p"))
+                
+    embed1 = discord.Embed(title="🔮 24-HOUR SHOP TIMELINE (PART 1) 🔮", color=discord.Color.purple())
+    embed2 = discord.Embed(title="🔮 24-HOUR SHOP TIMELINE (PART 2) 🔮", color=discord.Color.purple())
     count = 0
-    for seed, times in predictions.items():
+    for item, times in predictions.items():
         count += 1
         display_times = ", ".join(times[:4]) if times else "❌ No restocks predicted."
         if len(times) > 4: display_times += f" (+{len(times)-4} more)"
-        if count <= 13: embed1.add_field(name=f"🔹 {seed}", value=f"⏱️ {display_times}", inline=False)
-        else: embed2.add_field(name=f"🔹 {seed}", value=f"⏱️ {display_times}", inline=False)
+        if count <= 16: embed1.add_field(name=f"🔹 {item}", value=f"⏱️ {display_times}", inline=False)
+        else: embed2.add_field(name=f"🔹 {item}", value=f"⏱️ {display_times}", inline=False)
+        
     await ctx.send(embed=embed1)
     await ctx.send(embed=embed2)
 
