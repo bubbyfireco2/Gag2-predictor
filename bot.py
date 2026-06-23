@@ -29,7 +29,7 @@ CHANNEL_ID = 1518727458919284937  # Your personal alert channel ID
 
 # --- TARGET ENGINES (Change these to match the official server you are tracking!) ---
 # Replace with the exact Channel ID of the official server's stock log channel
-OFFICIAL_STOCK_CHANNEL_ID = 123456789012345678  
+OFFICIAL_STOCK_CHANNEL_ID = 1514960824060350569  
 
 DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get("RENDER") else "probability_memory.json"
 
