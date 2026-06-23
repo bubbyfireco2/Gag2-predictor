@@ -44,22 +44,6 @@ ALL_ITEMS_ODDS = {
     "Gnome": 5.0, "Basic Pot": 12.0, "Flashbang": 5.0
 }
 
-# ROLE ID DICTIONARY MAPPER (Extracts names directly out of your role number tags!)
-ROLE_MAP = {
-    "1515663877201727618": "Strawberry",
-    "1515663876732096582": "Blueberry",
-    "1515443219658309703": "Tulip",
-    "1515437833312272424": "Tomato",
-    "1515663875645902888": "Bamboo",
-    "1515437073211850922": "Carrot",
-    "1515438866675400775": "Apple",
-    "1515441615563653291": "Dragon Fruit",
-    "1515669111277879377": "Uncommon Sprinkler",
-    "1515663875943436338": "Mushroom",
-    "1515663877608570900": "Basic Pot",
-    "1515438868952776794": "Flashbang"
-}
-
 memory = {"last_seen": {}}
 active_predictions = []
 active_embeds = []
@@ -81,7 +65,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Role-Decoder Automated Predictor is live!')
+    print('Uncapped Automated Predictor is live!')
 
 async def run_auto_predictions(channel):
     global active_predictions
@@ -137,12 +121,17 @@ async def run_auto_24h_forecast(channel):
     msg2 = await channel.send(embed=embed2)
     active_embeds.extend([msg1, msg2])
 
-# --- ADVANCED CROWD-SOURCE AUTO LOGGER ---
+# --- SIMPLIFIED UNRESTRICTED AUTO LOGGER ---
 @bot.event
 async def on_message(message):
     global active_predictions, active_embeds
     
+    # 1. Broadly check if the message is in your channel
     if message.channel.id == CHANNEL_ID:
+        # Ignore messages sent by your own bot to prevent endless spam loops
+        if message.author.id == bot.user.id:
+            return
+
         text_to_scan = ""
         if message.content:
             text_to_scan += " " + message.content.lower()
@@ -154,44 +143,38 @@ async def on_message(message):
                     text_to_scan += " " + field.name.lower() + " " + field.value.lower()
 
         found_items = []
+        # Fallback check for general keyword "mushroom"
+        if "mushroom" in text_to_scan:
+            found_items.append("Mushroom")
 
-        # 1. EXTRACT FROM ROLE IDs (The long numbers from your clipboard text!)
-        for role_id, item_name in ROLE_MAP.items():
-            if role_id in text_to_scan:
-                if item_name not in found_items:
-                    found_items.append(item_name)
-
-        # 2. BACKUP EXTRACT FROM TEXT CHUNKS
+        # Directly match raw English substrings from the message
         for item in ALL_ITEMS_ODDS.keys():
             if item.lower() in text_to_scan:
                 if item not in found_items:
                     found_items.append(item)
 
-        # Special generic item fallback mappings
-        if "mushroom" in text_to_scan and "mushroom" not in [f.lower() for f in found_items]:
-            found_items.append("Mushroom")
-
-        # TRIGGER AUTO UPDATE SYSTEM
+        # 2. If ANY item is detected, instantly fire the prediction display engine
         if found_items:
             now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
             for item in found_items:
                 memory["last_seen"][item] = now_utc
             save_data()
-            print(f"[ROLE SCANNER SUCCESS] Auto-logged: {', '.join(found_items)}")
+            print(f"[UNRESTRICTED LOG SUCCESS] Auto-logged: {', '.join(found_items)}")
             
-            # Wipe older prediction blocks completely
+            # Wipe older posts
             for old_msg in active_predictions + active_embeds:
                 try: await old_msg.delete()
                 except: pass
             active_predictions.clear()
             active_embeds.clear()
             
-            # Wait 2 seconds and print fresh probabilities
-            await asyncio.sleep(2)
+            # Post fresh data
+            await asyncio.sleep(1)
             await run_auto_predictions(message.channel)
             await run_auto_24h_forecast(message.channel)
+
+    await bot.process_commands(message)
 
 if __name__ == "__main__":
     keep_alive()  
     bot.run(TOKEN)
-
