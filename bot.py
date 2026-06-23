@@ -154,30 +154,3 @@ async def predict_24_hours(ctx):
 if __name__ == "__main__":
     keep_alive()  # Fires up the Flask engine in the background
     bot.run(TOKEN)
-        
-        for seed, base_chance in SEED_ODDS.items():
-            roll = random.uniform(0, 100)
-            if roll <= base_chance:
-                time_str = simulated_time.strftime("%I:%M %p")
-                predictions[seed].append(time_str)
-
-    embed = discord.Embed(
-        title="🔮 24-HOUR SHOP RESTOCK TIMELINE FORECAST 🔮",
-        description="Estimated high-probability hours when rare seeds are most likely to drop over the next 24 hours:",
-        color=discord.Color.purple()
-    )
-
-    for seed, times in predictions.items():
-        if times:
-            display_times = ", ".join(times[:5])
-            if len(times) > 5:
-                display_times += f" (+{len(times)-5} more windows)"
-        else:
-            display_times = "❌ No restocks predicted in the next 24 hours."
-
-        embed.add_field(name=f"🔹 {seed} (Chance: {SEED_ODDS[seed]}%)", value=f"⏱️ **Estimated Windows:** {display_times}", inline=False)
-
-    embed.set_footer(text="Treat these as prime high-probability hunting windows!")
-    await ctx.send(embed=embed)
-
-bot.run(TOKEN)
