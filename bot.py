@@ -54,9 +54,7 @@ if os.path.exists(DATA_FILE):
     except: pass
 
 def save_data():
-    try:
-        with open(DATA_FILE, "w") as f: json.dump(memory, f)
-    except Exception as e: print(f"JSON Error: {e}")
+    with open(DATA_FILE, "w") as f: json.dump(memory, f)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -65,24 +63,24 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Web-Scraping Live Predictor is active!')
+    print('Targeted Card-Scraper is online!')
     sixty_second_clock_loop.start()
 
-# --- HIGH-DENSITY COMPACT TABLE GENERATOR ---
+# --- HIGH-DENSITY SHRUNK TEXT TABLE GENERATOR ---
 async def generate_compact_dashboard(channel):
     global active_messages
     now = datetime.datetime.now(datetime.timezone.utc)
     
-    # 1. CURRENTLY IN STOCK (COMPACT HEADER BOX)
+    # 1. CURRENTLY IN STOCK HEADER
     in_stock_list = memory.get("current_stock", [])
     stock_text = "🟢 **CURRENT SHOP INVENTORY:**\n```text\n"
     if in_stock_list:
         stock_text += " | ".join(in_stock_list) + "\n"
     else:
-        stock_text += "Fetching latest active web stock data...\n"
+        stock_text += "Fetching active inventory from game servers...\n"
     stock_text += "```\n"
 
-    # 2. NEXT SPAWN PREDICTIONS (SHRUNK TEXT COMPACT CODE GRIDS)
+    # 2. SEEDS AND GEAR GRIDS WITH EXACT SHRUNK ROW SPACING
     seeds_table = "```diff\n=== SEEDS RESTOCK ESTIMATES ===\n"
     gear_table = "```diff\n=== GEARS RESTOCK ESTIMATES ===\n"
     
@@ -98,15 +96,15 @@ async def generate_compact_dashboard(channel):
             minutes_since = int((now - last_time).total_seconds() / 60)
             rotations_missed = minutes_since // 5
             
-            # Pure mathematical step countdown
+            # Calculate countdown window based on expected frequency
             expected_interval_minutes = round((100 / base_chance) * 5)
             minutes_remaining = max(5, expected_interval_minutes - minutes_since)
             
-            # Single-reset immediate probability values
+            # Immediate next 5-min reset probability calculation
             chance_of_missing = 1 - (base_chance / 100)
             accumulated_odds = (1 - (chance_of_missing ** max(1, rotations_missed))) * 100
             
-            time_str = f"In ~{minutes_remaining}m"
+            time_str = f"{minutes_remaining}m"
             chance_str = f"{accumulated_odds:.1f}%"
             prefix = "- " if accumulated_odds > 75 else "  "
         else:
@@ -124,58 +122,56 @@ async def generate_compact_dashboard(channel):
     seeds_table += "```"
     gear_table += "```"
 
-    # Post all elements together inside an ultra-shrunk layout message bundle
     msg1 = await channel.send(stock_text)
     msg2 = await channel.send(seeds_table)
     msg3 = await channel.send(gear_table)
     
     active_messages.extend([msg1, msg2, msg3])
 
-# --- AUTOMATIC 60-SECOND WEBSITE SCRAPER LOOP ---
+# --- FIXED CARD-ISOLATION SCRAPER LOOP ---
 @tasks.loop(seconds=60)
 async def sixty_second_clock_loop():
     global active_messages
     channel = bot.get_channel(CHANNEL_ID)
     if not channel: return
 
-    print("[60 SECONDS TICK] Scraping live website tracking data frames...")
-    
     try:
-        # Fetch raw code from growagarden2stock.com
         req = urllib.request.Request('https://growagarden2stock.com', headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             html = response.read()
             
         soup = BeautifulSoup(html, 'html.parser')
-        page_text = soup.get_text().lower()
-
+        
         found_items = []
         now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        # Extract whatever items are present on the live webpage right now
-        for item in ALL_ITEMS_ODDS.keys():
-            if item.lower() in page_text:
-                found_items.append(item)
-                # True Log Update: Set the timestamp ONLY during the active minute blocks
-                memory["last_seen"][item] = now_utc
+        # FIX: Find every element box that represents a card container
+        # This isolates individual grids so text doesn't bleed together
+        for card in soup.find_all(['div', 'section']):
+            card_text = card.get_text().lower()
+            
+            # STRICT GUARD: This card container MUST explicitly say 'in stock' to pass [INDEX 0.1.10]
+            if "in stock" in card_text:
+                for item in ALL_ITEMS_ODDS.keys():
+                    if item.lower() in card_text:
+                        if item not in found_items:
+                            found_items.append(item)
+                            memory["last_seen"][item] = now_utc
 
-        # Overwrite what is currently sitting inside the game shop slots
         memory["current_stock"] = found_items
         save_data()
 
     except Exception as e:
         print(f"Web Scraper Connection Error: {e}")
 
-    # Sweep away old dashboard prints to prevent chat flooding
+    # Wipe and reprint high-density board layers
     for old_msg in active_messages:
         try: await old_msg.delete()
         except: pass
     active_messages.clear()
     
-    # Generate new micro-grid display layout boards instantly using fresh web data
     await generate_compact_dashboard(channel)
 
-# Disable standard on_message to optimize performance
 @bot.event
 async def on_message(message):
     await bot.process_commands(message)
@@ -183,4 +179,3 @@ async def on_message(message):
 if __name__ == "__main__":
     keep_alive()  
     bot.run(TOKEN)
-
