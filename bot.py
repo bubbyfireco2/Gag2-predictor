@@ -34,16 +34,16 @@ DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get(
 
 # COMBINED DATABASE WITH ALL GAINESVILLE SEEDS AND GEARS
 ALL_ITEMS_ODDS = {
-    "Carrot": 15.0, "Strawberry": 12.0, "Blueberry": 10.0, "Tulip": 8.0, "Tomato": 8.0, "Apple": 7.0, 
-    "Bamboo": 5.0, "Corn": 5.0, "Cactus": 4.5, "Pineapple": 4.0, "Mushroom": 3.5, "Green Bean": 3.5, 
-    "Banana": 3.0, "Grape": 3.0, "Coconut": 2.5, "Mango": 2.5, "Dragon Fruit": 2.0, "Acorn": 1.5, 
-    "Cherry": 1.5, "Sunflower": 1.2, "Venus Fly Trap": 1.0, "Pomegranate": 1.0, "Poison Apple": 3.0, 
-    "Venom Splitter": 2.5, "Moon Bloom": 1.0, "Dragon's Breath": 0.5,
-    "Common Sprinkler": 12.0, "Uncommon Sprinkler": 8.0, "Rare Sprinkler": 4.0,
-    "Legendary Sprinkler": 1.0, "Super Sprinkler": 0.5, "Common Watering Can": 15.0,
-    "Super Watering Can": 1.0, "Trowel": 10.0, "Jump Mushroom": 6.0, "Speed Mushroom": 6.0,
-    "Supersize Mushroom": 4.0, "Invisibility Mushroom": 3.0, "Shrink Mushroom": 4.0,
-    "Gnome": 5.0, "Basic Pot": 12.0, "Flashbang": 5.0
+    "Carrot": 100.0, "Strawberry": 100.0, "Blueberry": 100.0, "Tulip": 100.0, "Tomato": 90.0, "Apple": 52.0, 
+    "Bamboo": 80.0, "Corn": 25.0, "Cactus": 16.6, "Pineapple": 12.5, "Mushroom": 9.0, "Green Bean": 15.0, 
+    "Banana": 9.0, "Grape": 6.6, "Coconut": 5.0, "Mango": 5.0, "Dragon Fruit": 4.0, "Acorn": 2.9, 
+    "Cherry": 2.2, "Sunflower": 1.7, "Venus Fly Trap": 1.43, "Pomegranate": 0.9, "Poison Apple": 0.5, 
+    "Venom Splitter": 0.475, "Moon Bloom": 0.35, "Dragon's Breath": 0.275,
+    "Common Sprinkler": 50.0, "Uncommon Sprinkler": 35.0, "Rare Sprinkler": 25.0,
+    "Legendary Sprinkler": 4.0, "Super Sprinkler": 1.2, "Common Watering Can": 90.0,
+    "Super Watering Can": 2.0, "Trowel": 28.0, "Jump Mushroom": 24.0, "Speed Mushroom": 22.0,
+    "Supersize Mushroom": 10.0, "Invisibility Mushroom": 4.0, "Shrink Mushroom": 10.0,
+    "Gnome": 8.0, "Basic Pot": 7.0, "Flashbang": 7.0
 }
 
 memory = {"last_seen": {}}
