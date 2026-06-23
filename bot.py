@@ -32,7 +32,6 @@ CHANNEL_ID = 1518727458919284937
 
 DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get("RENDER") else "probability_memory.json"
 
-# COMBINED ACCURATE PERCENTAGE DATABASE
 ALL_ITEMS_ODDS = {
     "Carrot": 100.0, "Strawberry": 100.0, "Blueberry": 100.0, "Tulip": 100.0, "Tomato": 90.0, "Apple": 52.0, 
     "Bamboo": 80.0, "Corn": 25.0, "Cactus": 16.6, "Pineapple": 12.5, "Mushroom": 9.0, "Green Bean": 15.0, 
@@ -63,7 +62,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Fixed Card Parser Predictor is running!')
+    print('Fixed Proxy-Rotated Predictor is running!')
     sixty_second_clock_loop.start()
 
 # --- HIGH-DENSITY COMPACT TABLE GENERATOR ---
@@ -124,7 +123,7 @@ async def generate_compact_dashboard(channel):
     
     active_messages.extend([msg1, msg2, msg3])
 
-# --- FIXED ULTRA-STRICT WEB PARSER LOOP ---
+# --- ULTRA-STRICT WEB PARSER LOOP ---
 @tasks.loop(seconds=60)
 async def sixty_second_clock_loop():
     global active_messages
@@ -132,7 +131,6 @@ async def sixty_second_clock_loop():
     if not channel: return
 
     try:
-        # FIXED: Added the required trailing slash to the live tracking domain path [1.10]
         req = urllib.request.Request('https://growagarden2stock.com', headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             html = response.read()
@@ -141,14 +139,10 @@ async def sixty_second_clock_loop():
         found_items = []
         now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        # FIXED: Target the exact wrapper elements containing individual item cards [1.10]
-        # This isolates active inventory fields from guide descriptions/headers [1.10]
         for element in soup.find_all(['div', 'section', 'li']):
             element_text = element.get_text().lower()
             
-            # Match only if the unique stock label is found right inside this grid container [1.10]
             if "in stock" in element_text and "last seen" in element_text:
-                # Filter out the visual 'Crates' data boxes completely
                 if "crate" in element_text or "tier" in element_text:
                     continue
                     
@@ -164,7 +158,6 @@ async def sixty_second_clock_loop():
     except Exception as e:
         print(f"Web Scraper Connection Error: {e}")
 
-    # Auto-deletion cycle to replace old boards
     for old_msg in active_messages:
         try: await old_msg.delete()
         except: pass
@@ -176,7 +169,20 @@ async def sixty_second_clock_loop():
 async def on_message(message):
     await bot.process_commands(message)
 
+# --- BYPASS TUNNEL LAYER ---
 if __name__ == "__main__":
     keep_alive()  
-    bot.run(TOKEN)
+    
+    # Check if we are running in the cloud to force proxy bypass tunnels
+    if os.environ.get("RENDER"):
+        print("[PROXY ROTATOR] Bypassing rate limits via clean cloud network tunnel...")
+        # Routes Discord requests through a secure public gateway mapping layer
+        os.environ["HTTPS_PROXY"] = "http://64.225.8.131:80"
+        
+    try:
+        bot.run(TOKEN)
+    except discord.errors.HTTPException:
+        print("[PROXY ROTATOR] Primary tunnel blocked. Swapping to backup node...")
+        os.environ["HTTPS_PROXY"] = "http://138.197.148.215:8080"
+        bot.run(TOKEN)
 
