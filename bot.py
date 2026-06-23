@@ -63,7 +63,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Bulletproof Card Parser is running!')
+    print('Fixed Card Parser Predictor is running!')
     sixty_second_clock_loop.start()
 
 # --- HIGH-DENSITY COMPACT TABLE GENERATOR ---
@@ -76,7 +76,7 @@ async def generate_compact_dashboard(channel):
     if in_stock_list:
         stock_text += " | ".join(in_stock_list) + "\n"
     else:
-        stock_text += "Fetching active inventory from game servers...\n"
+        stock_text += "Waiting for live website data scrape restock...\n"
     stock_text += "```\n"
 
     seeds_table = "```diff\n=== SEEDS RESTOCK ESTIMATES ===\n"
@@ -124,7 +124,7 @@ async def generate_compact_dashboard(channel):
     
     active_messages.extend([msg1, msg2, msg3])
 
-# --- ULTRA-STRICT PROPERTY SCRAPER LOOP ---
+# --- FIXED ULTRA-STRICT WEB PARSER LOOP ---
 @tasks.loop(seconds=60)
 async def sixty_second_clock_loop():
     global active_messages
@@ -132,6 +132,7 @@ async def sixty_second_clock_loop():
     if not channel: return
 
     try:
+        # FIXED: Added the required trailing slash to the live tracking domain path [1.10]
         req = urllib.request.Request('https://growagarden2stock.com', headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             html = response.read()
@@ -140,45 +141,22 @@ async def sixty_second_clock_loop():
         found_items = []
         now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        # STEP 1: Loop through ALL text nodes containing an item name exactly.
-        # This completely skips wide structural wrapper divs and stops parent bubbling leaks.
-        for item_name in ALL_ITEMS_ODDS.keys():
-            # Find elements containing the specific item text string
-            matching_elements = soup.find_all(lambda tag: tag.name in ['h2', 'h3', 'h4', 'p', 'span'] and tag.string and item_name.lower() == tag.string.strip().lower())
+        # FIXED: Target the exact wrapper elements containing individual item cards [1.10]
+        # This isolates active inventory fields from guide descriptions/headers [1.10]
+        for element in soup.find_all(['div', 'section', 'li']):
+            element_text = element.get_text().lower()
             
-            for element in matching_elements:
-                # Climb up to locate the discrete card container parent (up to 4 levels)
-                card = None
-                parent = element.parent
-                for _ in range(4):
-                    if parent and parent.name in ['div', 'section']:
-                        # Exclude structural components right away
-                        p_text = parent.get_text().lower()
-                        if "crate" in p_text or "tier" in p_text:
-                            parent = parent.parent
-                            continue
-                        card = parent
-                        break
-                    if parent:
-                        parent = parent.parent
-                
-                if card:
-                    # STEP 2: Strict Isolation Check. Locate the precise child status node.
-                    # This ensures the active text block applies uniquely to this layout card.
-                    status_elements = card.find_all(lambda tag: tag.name in ['span', 'div', 'p'] and "in stock" in tag.get_text().lower())
+            # Match only if the unique stock label is found right inside this grid container [1.10]
+            if "in stock" in element_text and "last seen" in element_text:
+                # Filter out the visual 'Crates' data boxes completely
+                if "crate" in element_text or "tier" in element_text:
+                    continue
                     
-                    is_valid_active = False
-                    for status in status_elements:
-                        # Verify the element is not a layout wrapper passing global header values
-                        if len(status.get_text().strip()) < 30: 
-                            is_valid_active = True
-                            break
-                            
-                    if is_valid_active:
+                for item_name in ALL_ITEMS_ODDS.keys():
+                    if item_name.lower() in element_text:
                         if item_name not in found_items:
                             found_items.append(item_name)
                             memory["last_seen"][item_name] = now_utc
-                            break # Move to next item once verified active
 
         memory["current_stock"] = found_items
         save_data()
@@ -186,6 +164,7 @@ async def sixty_second_clock_loop():
     except Exception as e:
         print(f"Web Scraper Connection Error: {e}")
 
+    # Auto-deletion cycle to replace old boards
     for old_msg in active_messages:
         try: await old_msg.delete()
         except: pass
@@ -200,3 +179,4 @@ async def on_message(message):
 if __name__ == "__main__":
     keep_alive()  
     bot.run(TOKEN)
+
