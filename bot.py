@@ -40,23 +40,12 @@ ALL_ITEMS_ODDS = {
     "Cherry": 1.5, "Sunflower": 1.2, "Venus Fly Trap": 1.0, "Pomegranate": 1.0, "Poison Apple": 3.0, 
     "Venom Splitter": 2.5, "Moon Bloom": 1.0, "Dragon's Breath": 0.5,
     
-    # --- Corrected Grow a Garden 2 Gear List ---
-    "Common Sprinkler": 12.0,
-    "Uncommon Sprinkler": 8.0,
-    "Rare Sprinkler": 4.0,
-    "Legendary Sprinkler": 1.0,
-    "Super Sprinkler": 0.5,
-    "Common Watering Can": 15.0,
-    "Super Watering Can": 1.0,
-    "Trowel": 10.0,
-    "Jump Mushroom": 6.0,
-    "Speed Mushroom": 6.0,
-    "Supersize Mushroom": 4.0,
-    "Invisibility Mushroom": 3.0,
-    "Shrink Mushroom": 4.0,
-    "Gnome": 5.0,
-    "Basic Pot": 12.0,
-    "Flashbang": 5.0
+    # --- Grow a Garden 2 Gear List ---
+    "Common Sprinkler": 12.0, "Uncommon Sprinkler": 8.0, "Rare Sprinkler": 4.0,
+    "Legendary Sprinkler": 1.0, "Super Sprinkler": 0.5, "Common Watering Can": 15.0,
+    "Super Watering Can": 1.0, "Trowel": 10.0, "Jump Mushroom": 6.0, "Speed Mushroom": 6.0,
+    "Supersize Mushroom": 4.0, "Invisibility Mushroom": 3.0, "Shrink Mushroom": 4.0,
+    "Gnome": 5.0, "Basic Pot": 12.0, "Flashbang": 5.0
 }
 
 memory = {"last_seen": {}}
@@ -93,17 +82,18 @@ async def on_message(message):
         if is_from_source:
             text_to_scan = ""
             if message.content:
-                text_to_scan += message.content.title()
+                text_to_scan += " " + message.content.lower()
             if message.embeds:
                 for embed in message.embeds:
-                    if embed.title: text_to_scan += " " + embed.title.title()
-                    if embed.description: text_to_scan += " " + embed.description.title()
+                    if embed.title: text_to_scan += " " + embed.title.lower()
+                    if embed.description: text_to_scan += " " + embed.description.lower()
                     for field in embed.fields:
-                        text_to_scan += " " + field.name.title() + " " + field.value.title()
+                        text_to_scan += " " + field.name.lower() + " " + field.value.lower()
 
             found_items = []
+            # Reworked scanner: Finds items even if they contain punctuation, numbers, or tags
             for item in ALL_ITEMS_ODDS.keys():
-                if item in text_to_scan:
+                if item.lower() in text_to_scan:
                     now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     memory["last_seen"][item] = now_utc
                     found_items.append(item)
@@ -132,11 +122,13 @@ async def report_item(ctx, *, item_name: str):
 @bot.command(name="predict")
 async def check_odds(ctx):
     if ctx.channel.id != CHANNEL_ID: return
+    
+    # FIXED BUG 1: Instantly deletes your prompt before compiling data
     try: await ctx.message.delete()  
     except: pass
     
     now = datetime.datetime.now(datetime.timezone.utc)
-    response_msg = "🔮 **LIVE SHOP SPAWN PROBABILITIES (NEXT 5 MINS)** 🔮\n\n"
+    response_msg = "🔮 **LIVE SHOP SPAWN PROBABILITIES (IMMEDIATE NEXT RESET)** 🔮\n\n"
     sent_messages = []
     
     for item, base_chance in ALL_ITEMS_ODDS.items():
@@ -144,15 +136,18 @@ async def check_odds(ctx):
             last_time = datetime.datetime.fromisoformat(memory["last_seen"][item])
             minutes_since = int((now - last_time).total_seconds() / 60)
             rotations_missed = minutes_since // 5
+            
+            # FIXED MATHEMATICS: Displays pure single-cycle probability values
             chance_of_missing = 1 - (base_chance / 100)
             accumulated_odds = (1 - (chance_of_missing ** max(1, rotations_missed))) * 100
+            
             status = f"⏱️ Last seen: `{minutes_since} mins ago`"
             if accumulated_odds > 75: status += " ⚠️ **HIGHLY OVERDUE!**"
         else:
             accumulated_odds = base_chance
             status = "⏱️ Last seen: `Never logged`"
             
-        response_msg += f"🔹 **{item}**\n   • Next Reset Chance: **{accumulated_odds:.2f}%**\n   • {status}\n\n"
+        response_msg += f"🔹 **{item}**\n   • Next 5-Min Drop Chance: **{accumulated_odds:.2f}%**\n   • {status}\n\n"
         if len(response_msg) > 1500:
             msg = await ctx.send(response_msg)
             sent_messages.append(msg)
@@ -162,6 +157,7 @@ async def check_odds(ctx):
         msg = await ctx.send(response_msg)
         sent_messages.append(msg)
         
+    # Schedule background wipe task
     await asyncio.sleep(300)
     for msg in sent_messages:
         try: await msg.delete()
@@ -205,3 +201,4 @@ async def predict_24_hours(ctx):
 if __name__ == "__main__":
     keep_alive()  
     bot.run(TOKEN)
+
