@@ -28,7 +28,7 @@ def keep_alive():
 
 # --- CONFIGURATION SETTINGS ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")  
-CHANNEL_ID = 1518727458919284937  # Your personal alert channel ID where predictions post
+CHANNEL_ID = 1518727458919284937  
 
 DATA_FILE = "/opt/render/project/src/probability_memory.json" if os.environ.get("RENDER") else "probability_memory.json"
 
@@ -63,15 +63,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f'Logged in successfully as {bot.user}')
-    print('Targeted Card-Scraper is online!')
+    print('Bulletproof Card Parser is running!')
     sixty_second_clock_loop.start()
 
-# --- HIGH-DENSITY SHRUNK TEXT TABLE GENERATOR ---
+# --- HIGH-DENSITY COMPACT TABLE GENERATOR ---
 async def generate_compact_dashboard(channel):
     global active_messages
     now = datetime.datetime.now(datetime.timezone.utc)
     
-    # 1. CURRENTLY IN STOCK HEADER
     in_stock_list = memory.get("current_stock", [])
     stock_text = "🟢 **CURRENT SHOP INVENTORY:**\n```text\n"
     if in_stock_list:
@@ -80,7 +79,6 @@ async def generate_compact_dashboard(channel):
         stock_text += "Fetching active inventory from game servers...\n"
     stock_text += "```\n"
 
-    # 2. SEEDS AND GEAR GRIDS WITH EXACT SHRUNK ROW SPACING
     seeds_table = "```diff\n=== SEEDS RESTOCK ESTIMATES ===\n"
     gear_table = "```diff\n=== GEARS RESTOCK ESTIMATES ===\n"
     
@@ -96,11 +94,9 @@ async def generate_compact_dashboard(channel):
             minutes_since = int((now - last_time).total_seconds() / 60)
             rotations_missed = minutes_since // 5
             
-            # Calculate countdown window based on expected frequency
             expected_interval_minutes = round((100 / base_chance) * 5)
             minutes_remaining = max(5, expected_interval_minutes - minutes_since)
             
-            # Immediate next 5-min reset probability calculation
             chance_of_missing = 1 - (base_chance / 100)
             accumulated_odds = (1 - (chance_of_missing ** max(1, rotations_missed))) * 100
             
@@ -128,7 +124,7 @@ async def generate_compact_dashboard(channel):
     
     active_messages.extend([msg1, msg2, msg3])
 
-# --- FIXED CARD-ISOLATION SCRAPER LOOP ---
+# --- ULTRA-STRICT PROPERTY SCRAPER LOOP ---
 @tasks.loop(seconds=60)
 async def sixty_second_clock_loop():
     global active_messages
@@ -141,22 +137,48 @@ async def sixty_second_clock_loop():
             html = response.read()
             
         soup = BeautifulSoup(html, 'html.parser')
-        
         found_items = []
         now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        # FIX: Find every element box that represents a card container
-        # This isolates individual grids so text doesn't bleed together
-        for card in soup.find_all(['div', 'section']):
-            card_text = card.get_text().lower()
+        # STEP 1: Loop through ALL text nodes containing an item name exactly.
+        # This completely skips wide structural wrapper divs and stops parent bubbling leaks.
+        for item_name in ALL_ITEMS_ODDS.keys():
+            # Find elements containing the specific item text string
+            matching_elements = soup.find_all(lambda tag: tag.name in ['h2', 'h3', 'h4', 'p', 'span'] and tag.string and item_name.lower() == tag.string.strip().lower())
             
-            # STRICT GUARD: This card container MUST explicitly say 'in stock' to pass [INDEX 0.1.10]
-            if "in stock" in card_text:
-                for item in ALL_ITEMS_ODDS.keys():
-                    if item.lower() in card_text:
-                        if item not in found_items:
-                            found_items.append(item)
-                            memory["last_seen"][item] = now_utc
+            for element in matching_elements:
+                # Climb up to locate the discrete card container parent (up to 4 levels)
+                card = None
+                parent = element.parent
+                for _ in range(4):
+                    if parent and parent.name in ['div', 'section']:
+                        # Exclude structural components right away
+                        p_text = parent.get_text().lower()
+                        if "crate" in p_text or "tier" in p_text:
+                            parent = parent.parent
+                            continue
+                        card = parent
+                        break
+                    if parent:
+                        parent = parent.parent
+                
+                if card:
+                    # STEP 2: Strict Isolation Check. Locate the precise child status node.
+                    # This ensures the active text block applies uniquely to this layout card.
+                    status_elements = card.find_all(lambda tag: tag.name in ['span', 'div', 'p'] and "in stock" in tag.get_text().lower())
+                    
+                    is_valid_active = False
+                    for status in status_elements:
+                        # Verify the element is not a layout wrapper passing global header values
+                        if len(status.get_text().strip()) < 30: 
+                            is_valid_active = True
+                            break
+                            
+                    if is_valid_active:
+                        if item_name not in found_items:
+                            found_items.append(item_name)
+                            memory["last_seen"][item_name] = now_utc
+                            break # Move to next item once verified active
 
         memory["current_stock"] = found_items
         save_data()
@@ -164,7 +186,6 @@ async def sixty_second_clock_loop():
     except Exception as e:
         print(f"Web Scraper Connection Error: {e}")
 
-    # Wipe and reprint high-density board layers
     for old_msg in active_messages:
         try: await old_msg.delete()
         except: pass
