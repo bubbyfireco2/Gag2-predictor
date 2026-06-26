@@ -94,18 +94,18 @@ async def toggle_item_alert(ctx, *, item_and_mode: str):
             break
             
     if not matched_item:
-        await ctx.send(f"❌ **Item Not Found!** Spell check name tracker parameter `{target_item_raw}`.")
+        await ctx.send(f"❌ **Item Not Found!** Check spelling for `{target_item_raw}`.")
         return
         
     if mode == "on":
         memory["enabled_alerts"][matched_item] = True
         save_data()
-        await ctx.send(f"BC-🔔 **Alert Enabled!** I will ping @everyone for **{matched_item}** changes.")
+        await ctx.send(f"🔔 **Alert Enabled!** I will ping @everyone for **{matched_item}** changes.")
     else:
         if matched_item in memory["enabled_alerts"]:
             del memory["enabled_alerts"][matched_item]
         save_data()
-        await ctx.send(f"BC-🔕 **Alert Disabled!** Turned off pings for **{matched_item}**.")
+        await ctx.send(f"🔕 **Alert Disabled!** Turned off pings for **{matched_item}**.")
 
 @bot.command(name="alerts")
 async def list_alert_status(ctx):
@@ -212,11 +212,10 @@ async def dashboard_refresh_loop():
     channel = bot.get_channel(CHANNEL_ID)
     if not channel: return
 
-    # 🔥 THE CHANNELS CLEANER ENGINE: Purges all historical text layout blocks cleanly
     try:
         await channel.purge(limit=100)
     except Exception as e:
-        print(f"Purge Warning (Ensure bot has 'Manage Messages' permission): {e}")
+        print(f"Purge Warning: {e}")
     
     await generate_compact_dashboard(channel)
 
@@ -237,4 +236,6 @@ async def on_message(message):
                     for field in embed.fields:
                         text_dump.append(field.name)
                         text_dump.append(field.value)
+                if embed.footer and embed.footer.text: text_dump.append(embed.footer.text)
+                if embed.author and embed.author.name: text_dump.append(embed.author.name)
 
