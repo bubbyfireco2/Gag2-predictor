@@ -216,6 +216,9 @@ async def dashboard_refresh_loop():
     channel = bot.get_channel(CHANNEL_ID)
     if not channel: return
     
-    # 🔥 Wipes the display channel completely clean before printing new tables
     try: 
+        await channel.purge(limit=100)
+    except Exception as e: 
+        print(f"Purge Warning: {e}")
+        
 
