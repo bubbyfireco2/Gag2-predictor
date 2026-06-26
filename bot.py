@@ -30,7 +30,7 @@ def keep_alive():
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")  
 CHANNEL_ID = 1518727458919284937  # Your visual dashboard channel
 
-# ✅ HARDCODED CONFIGURATION: Your real tracking channels are permanently locked in!
+# HARDCODED CONFIGURATION: Your real tracking channels are permanently locked in!
 SEED_CHANNEL_ID = 1514960824060350569  
 GEAR_CHANNEL_ID = 1514960828955361301  
 
@@ -139,11 +139,11 @@ async def toggle_item_alert(ctx, *, item_and_mode: str):
     if mode == "on":
         memory["enabled_alerts"][matched_item] = True
         save_data()
-        await ctx.send(f"BC-🔔 **Alert Enabled!** Pings activated for **{matched_item}**.")
+        await ctx.send(f"🔔 **Alert Enabled!** Pings activated for **{matched_item}**.")
     else:
         if matched_item in memory["enabled_alerts"]: del memory["enabled_alerts"][matched_item]
         save_data()
-        await ctx.send(f"BC-🔕 **Alert Disabled!** Turned off pings for **{matched_item}**.")
+        await ctx.send(f"🔕 **Alert Disabled!** Turned off pings for **{matched_item}**.")
 
 @bot.command(name="alerts")
 async def list_alert_status(ctx):
@@ -218,3 +218,5 @@ async def dashboard_refresh_loop():
     
     try: 
         await channel.purge(limit=100)
+    except Exception as e: 
+
